@@ -16,6 +16,7 @@ class MeiMei(pygame.sprite.Sprite):
         self.character.append(self.idleAnim())
         #print(self.character)
         self.character.append(self.flyingAnim())
+        self.character.append(self.speedingAnim())
         self.rect = self.character[0][0].get_rect(center=pos)
         self.position = (0,0)
         #self.flippedPlayer = pygame.transform.flip(self.character[self.currentSprite], flip_x=False, flip_y=False)
@@ -25,9 +26,24 @@ class MeiMei(pygame.sprite.Sprite):
         self.speedBonus = 1
         self.isLeft = False
         self.isRight = False
+        self.tick = 0
 
 
     def idleAnim(self):
+        spriteW, spriteH = 63,58
+        numCol = 5
+        numRow = 0
+        spriteList = []
+        for col in range(numCol):
+            x = col * spriteW
+            y = numRow * spriteH
+            sprite = self.spriteSheet.subsurface(pygame.Rect(x, y, spriteW,spriteH))
+            rect = sprite.get_rect(center=(0,0))
+            scaledSprite = pygame.transform.scale(sprite, (rect.width*4,rect.height*4))
+            spriteList.append(scaledSprite)
+        return spriteList
+    
+    def flyingAnim(self):
         spriteW, spriteH = 63,58
         numCol = 5
         numRow = 1
@@ -41,7 +57,7 @@ class MeiMei(pygame.sprite.Sprite):
             spriteList.append(scaledSprite)
         return spriteList
     
-    def flyingAnim(self):
+    def speedingAnim(self):
         spriteW, spriteH = 63,58
         numCol = 5
         numRow = 2
@@ -82,28 +98,33 @@ class MeiMei(pygame.sprite.Sprite):
         if keys[pygame.K_RIGHT]:
             self.direction.x = 1
             if self.isRight == False:
+                # automate this later..
                 self.character[0] = self.goingRight(0)
                 self.character[1] = self.goingRight(1)
+                self.character[2] = self.goingRight(2)
                 self.isLeft = False
                 self.isRight = True
 
         elif keys[pygame.K_LEFT]:
             self.direction.x = -1
             if self.isLeft == False:
+                # automate this later..
                 self.character[0] = self.goingLeft(0)
                 self.character[1] = self.goingLeft(1)
+                self.character[2] = self.goingLeft(2)
                 self.isRight = False
                 self.isLeft = True
         else:
             self.direction.x = 0
         
         if keys[pygame.K_LSHIFT]:
-            tick = pygame.time.get_ticks()
-            self.speed = 4
-            print(tick//60)
+            if keys[pygame.K_LEFT] or keys[pygame.K_RIGHT]:
+                self.tick += (pygame.time.get_ticks()//2500)
+                self.speed = 4
+                
             
         else:
-            tick = 0
+            self.tick = 0
             self.speed = 2
         
         
@@ -165,7 +186,7 @@ class cameraGroup(pygame.sprite.Group):
         keys = pygame.key.get_pressed()
         self.centerOnPlayer(player)
         self.internalSurface.fill('white')
-        spriteType = 0
+        self.spriteType = 0
         # ground
         mapOffset = self.mapRect.topleft - self.offset + self.internalOffset # 862, 1092
         self.internalSurface.blit(self.mapSurface, mapOffset)
@@ -177,22 +198,24 @@ class cameraGroup(pygame.sprite.Group):
             offsetPos = sprite.rect.topleft - self.offset + self.internalOffset # 902, 852
             # iterate through sprites to create animation
             if currentTick - self.lastTick >= self.animationDelay:
-                if self.frame < len(sprite.character[spriteType])-1:
+                if self.frame < len(sprite.character[self.spriteType])-1:
                     self.frame += 1
                 else:
                     self.frame = 0
                 self.lastTick = currentTick
-
-            if keys[pygame.K_LSHIFT] and keys[pygame.K_RIGHT]:
-                spriteType = 1
-            elif keys[pygame.K_LSHIFT] and keys[pygame.K_LEFT]:
-                spriteType = 1
+            # change animation based on movement type
+            if keys[pygame.K_RIGHT] or keys[pygame.K_LEFT]:
+                # flying
+                self.spriteType = 1
+                if keys[pygame.K_LSHIFT] and (keys[pygame.K_RIGHT] or keys[pygame.K_LEFT]):
+                    # speeding
+                    self.spriteType = 2
             else:
-                spriteType = 0
+                # idle
+                self.spriteType = 0
 
-            self.internalSurface.blit(sprite.character[spriteType][self.frame], offsetPos)
+            self.internalSurface.blit(sprite.character[self.spriteType][self.frame], offsetPos)
 
-        
 
         scaledSurf = pygame.transform.scale(self.internalSurface, self.internalSurfaceSizeVect * self.zoomScale)
         scaledRect = scaledSurf.get_rect(center = (self.halfWidth, self.halfHeight))
